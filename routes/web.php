@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\TaskController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -8,63 +10,27 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 |
 | Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| contains the "web" middleware group. Now create something great!
+| routes are loaded by the RouteServiceProvider and all of them will
+| be assigned to the "web" middleware group. Make something great!
 |
 */
 
-Route::get('/', function () {
-    return view('index');
-})->name('home');
+Route::view('/', 'page.index', ['title' => 'Описание задачи'])->name('index');
 
-Route::prefix('user')->name('user.')->group(function () {
-    Route::get('/registry', function () {
-        return view('user.registry');
-    })->name('registry')->middleware('guest');
+Route::controller(UserController::class)->prefix('user')->name('user.')->group(function () {
+    Route::middleware('guest')->group(function () {
+        Route::view('/registry', 'page.user.registry', ['title' => 'Регистрация'])->name('registry');
+        Route::post('/create', 'create')->name('create');
+        Route::view('/login', 'page.user.login', ['title' => 'Авторизация'])->name('login');
+        Route::post('/auth', 'auth')->name('auth');
+    });
 
-    Route::post('/create', [
-        \App\Http\Controllers\UserController::class, 'create'
-    ])->name('create')->middleware('guest');
-
-    Route::get('/login', function () {
-        return view('user.login');
-    })->name('login')->middleware('guest');
-
-    Route::post('/auth', [
-        \App\Http\Controllers\UserController::class, 'auth'
-    ])->name('auth')->middleware('guest');
-
-    Route::get('/logout', [
-        \App\Http\Controllers\UserController::class, 'logout'
-    ])->name('logout')->middleware('auth');
+    Route::get('/logout', 'logout')->name('logout')->middleware('auth');
 });
 
-Route::prefix('task')->name('task.')->group(function () {
-    Route::get('/', [
-        \App\Http\Controllers\TaskController::class, 'main'
-    ])->name('main')->middleware('auth');
-
-    Route::any('/{id}/delete', [
-        \App\Http\Controllers\TaskController::class, 'delete'
-    ])->name('delete');
-
-    Route::get('/get/{id}', [
-        \App\Http\Controllers\TaskController::class, 'get'
-    ])->name('get')->middleware('auth');
-
-    Route::post('/update', [
-        \App\Http\Controllers\TaskController::class, 'update'
-    ])->name('update')->middleware('auth');
-
-    Route::get('/all', [
-        \App\Http\Controllers\TaskController::class, 'all'
-    ])->name('all')->middleware('auth');
-
-    Route::get('/create', [
-        \App\Http\Controllers\TaskController::class, 'create'
-    ])->name('create')->middleware('auth');
-
-    Route::post('/save', [
-        \App\Http\Controllers\TaskController::class, 'save'
-    ])->name('save')->middleware('auth');
+Route::controller(TaskController::class)->middleware('auth')->prefix('task')->name('task.')->group(function () {
+    Route::get('/list/{view}', 'index')->name('index')->whereIn('view', ['all', 'user']);
+    Route::get('/manage/{task?}', 'manage')->name('manage');
+    Route::post('/save/{task?}', 'save')->name('save');
+    Route::get('/delete/{task}', 'delete')->name('delete')->middleware('can:delete,task');
 });

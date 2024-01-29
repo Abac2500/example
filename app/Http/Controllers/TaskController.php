@@ -4,145 +4,104 @@ namespace App\Http\Controllers;
 
 use App\Models\Task;
 use App\Models\User;
-use App\Notifications\NewTask;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 
 class TaskController extends Controller
 {
     /**
-     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
+     * Вывод списка задач.
+     *
+     * @param Request $request
+     * @param User $user
+     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Foundation\Application
      */
-    public function main()
+    public function index(string $view)
     {
-        $tasks = Task::where('user_id', auth()->user()->getAuthIdentifier())
-            ->orderByDesc('last')
-            ->paginate(5);
+        switch ($view) {
+            case 'all':
+                $tasks = new Task();
+                break;
+            case 'user':
+                $tasks = auth()->user()->tasks();
+                break;
+        }
+        $tasks = $tasks->orderByDesc('expiration_at')->paginate(5);
 
-        return view('task.main', compact('tasks'));
+        $title = 'Список задач';
+
+        return view('page.task.index', compact('tasks', 'title'));
     }
 
     /**
-     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
+     * Редактирование или создание задачи.
+     *
+     * @param Request $request
+     * @param Task $task
+     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Foundation\Application
+     * @throws \Illuminate\Auth\Access\AuthorizationException
      */
-    public function all()
+    public function manage(Request $request, Task $task)
     {
-        $tasks = Task::orderByDesc('last')->paginate(5);
+        $has = $request->route()->hasParameter('task');
+        if ($has) {
+            $this->authorize('update', $task);
+        }
+        $users = User::all();
 
-        return view('task.main', compact('tasks'));
+        $title = $has ? "Редактирование - " . $task->name : 'Новая задача';
+
+        return view('page.task.manage', compact('task', 'users', 'title'));
     }
 
     /**
-     * @param $id
+     * Сохранение задачи.
+     *
+     * @param Request $request
+     * @param Task $task
      * @return \Illuminate\Http\RedirectResponse
      * @throws \Illuminate\Auth\Access\AuthorizationException
      */
-    public function delete($id)
+    public function save(Request $request, Task $task)
     {
-        $task = Task::find($id);
+        $has = $request->route()->hasParameter('task');
+        if ($has) {
+            $this->authorize('update', $task);
+        }
 
-        $this->authorize('delete', $task);
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'text' => 'required|string|max:1024',
+            'user_id' => 'required|integer|exists:App\Models\User,id',
+            'expiration_at' => 'required|date'
+        ], [], [
+            'name' => 'Название',
+            'text' => 'Описание',
+            'user' => 'Исполнитель',
+            'expiration_at' => 'Дата окончания срока'
+        ]);
+
+        if (!$has) {
+            $task = new Task();
+        }
+        $task->name = $request->name;
+        $task->text = $request->text;
+        $task->user_id = $request->user_id;
+        $task->expiration_at = $request->expiration_at;
+        $task->save();
+
+        return to_route('task.manage', ['task' => $task->id])->with('success', 'Задача успешно сохранена');
+    }
+
+    /**
+     * Удаление задачи.
+     *
+     * @param Task $task
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function delete(Task $task)
+    {
         $task->delete();
 
-        return redirect()
-            ->route('task.main')
-            ->with('success', 'Вы успешно удалили задачу.');
-    }
-
-    /**
-     * @param $id
-     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
-     * @throws \Illuminate\Auth\Access\AuthorizationException
-     */
-    public function get($id)
-    {
-        $task = Task::findOrFail($id);
-
-        $this->authorize('update', $task);
-        $users = User::all();
-
-        return view('task.get', compact('task', 'users'));
-    }
-
-    /**
-     * @param Request $request
-     * @return \Illuminate\Http\RedirectResponse
-     * @throws \Illuminate\Auth\Access\AuthorizationException
-     */
-    public function update(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'id' => 'required|integer|exists:App\Models\Task,id',
-            'name' => 'required|string|min:3|max:250',
-            'text' => 'required|string|min:3|max:999',
-            'user' => 'required|integer|exists:App\Models\User,id',
-            'count' => 'required|integer|min:1|max:100',
-            'last' => 'required|date'
-        ]);
-
-        if ($validator->fails()) {
-            return back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-
-        $task = Task::findOrFail($request->id);
-
-        $this->authorize('update', $task);
-        $task->user_id = $request->user;
-        $task->name = $request->name;
-        $task->text = $request->text;
-        $task->count = $request->count;
-        $task->last = $request->last;
-        $task->save();
-
-        return back()
-            ->with('success', 'Задача успешно изменена');
-    }
-
-    /**
-     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
-     */
-    public function create()
-    {
-        $users = User::all();
-
-        return view('task.create', compact('users'));
-    }
-
-    /**
-     * @param Request $request
-     * @return \Illuminate\Http\RedirectResponse
-     */
-    public function save(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|min:3|max:250',
-            'text' => 'required|string|min:3|max:999',
-            'user' => 'required|integer|exists:App\Models\User,id',
-            'count' => 'required|integer|min:1|max:100',
-            'last' => 'required|date'
-        ]);
-
-        if ($validator->fails()) {
-            return back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-
-        $task = new Task();
-        $task->user_id = $request->user;
-        $task->name = $request->name;
-        $task->text = $request->text;
-        $task->count = $request->count;
-        $task->last = $request->last;
-        $task->save();
-
-        if ($task->user->id !== auth()->user()->getAuthIdentifier()) {
-            $task->user->notify(new NewTask(auth()->user(), $task));
-        }
-
-        return redirect()->route('task.main')
-            ->with('success', 'Задача успешно создана');
+        return back()->with('success', 'Вы успешно удалили задачу');
     }
 }

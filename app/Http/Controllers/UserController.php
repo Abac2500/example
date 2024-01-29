@@ -4,70 +4,70 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
 {
     /**
+     * Регистрация пользователя
+     *
      * @param Request $request
      * @return \Illuminate\Http\RedirectResponse
      */
     public function create(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+        $request->validate([
             'email' => 'required|email:rfc,dns|unique:App\Models\User',
-            'password' => 'required|confirmed|min:8|max:64'
+            'password' => 'required|confirmed|between:8,64'
+        ], [], [
+            'email' => 'Электронная почта',
+            'password' => 'Пароль'
         ]);
-
-        if ($validator->fails()) {
-            return back()
-                ->withErrors($validator)
-                ->withInput();
-        }
 
         $user = new User();
         $user->email = $request->email;
         $user->password = $request->password;
         $user->save();
 
-        return redirect()
-            ->route('user.login')
-            ->with('success', 'Вы успешно зарегистрировались');
+        auth()->login($user);
+
+        return to_route('task.index', ['view' => 'user'])->with('success', 'Вы успешно зарегистрировались');
     }
 
     /**
+     * Авторизация пользователя
+     *
      * @param Request $request
      * @return \Illuminate\Http\RedirectResponse
      */
     public function auth(Request $request)
     {
-        $validator = $request->validate([
+        $request->validate([
             'email' => 'required|email:rfc',
-            'password' => 'required|min:8'
+            'password' => 'required|between:8,64',
+            'remember_token' => 'nullable|boolean'
         ]);
 
-        if (Auth::attempt($validator, $request->remember_token)) {
+        if (auth()->attempt($request->only('email', 'password'), $request->remember_token)) {
             $request->session()->regenerate();
 
-            return redirect()
-                ->intended(route('home'))
-                ->with('success', 'Вы успешно прошли авторизацию.');
+            return to_route('task.index', ['view' => 'user'])->with('success', 'Вы успешно прошли авторизацию');
         }
 
-        return back()
-            ->withErrors(['Предоставленные учетные данные не найдены.'])
-            ->withInput();
+        return back()->withErrors(['Предоставленные учетные данные не найдены']);
     }
 
+    /**
+     * Выход из учетной записи
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
     public function logout(Request $request)
     {
-        Auth::logout();
+        auth()->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()
-            ->route('home')
-            ->with('success', 'Вы успешно вышли из учетной записи.');
+        return to_route('index')->with('success', 'Вы успешно вышли из учетной записи');
     }
 }

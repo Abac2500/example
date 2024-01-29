@@ -1,16 +1,15 @@
 <div class="card w-100 mt-3">
-    <div class="card-header{{ $task->last < \Carbon\Carbon::now() ? ' text-danger' : '' }}">Дата окончания: {{ $task->last->format('d.m.Y') }}</div>
+    <div @class([
+        'card-header',
+        'text-danger' => $task->expiration_at < now()
+    ])>Дата окончания: {{ $task->expiration_at->format('d.m.Y') }}</div>
     <div class="card-body">
         <h5 class="card-title">{{ $task->name }}</h5>
         <p class="card-text">{{ $task->text }}</p>
         @can(['delete', 'update'], $task)
             <div class="d-flex gap-3 mb-3">
-                <a href="{{ route('task.get', $task->id) }}" class="btn btn-success">Изменить</a>
-                <form method="POST" action="{{ route('task.delete', $task->id) }}">
-                    @csrf
-                    @method('delete')
-                    <button type="submit" class="btn btn-danger">Удалить</button>
-                </form>
+                <a href="{{ route('task.manage', ['task' => $task->id]) }}" class="btn btn-success">Изменить</a>
+                <a href="{{ route('task.delete', ['task' => $task->id]) }}" class="btn btn-danger">Удалить</a>
             </div>
         @endcan
         <p class="card-text">

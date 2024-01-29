@@ -2,11 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Casts\Attribute;
+// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -19,9 +18,8 @@ class User extends Authenticatable
      * @var array<int, string>
      */
     protected $fillable = [
-        'name',
         'email',
-        'password',
+        'password'
     ];
 
     /**
@@ -31,21 +29,35 @@ class User extends Authenticatable
      */
     protected $hidden = [
         'password',
-        'remember_token',
+        'remember_token'
     ];
 
     /**
-     * @return Attribute
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
      */
-    public function password(): Attribute
-    {
-        return new Attribute(
-            set: fn ($value) => Hash::make($value)
-        );
-    }
+    protected $casts = [
+        'password' => 'hashed'
+    ];
 
+    /**
+     * Получить все задачи пользователя.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
     public function tasks()
     {
         return $this->hasMany(Task::class);
+    }
+
+    /**
+     * Определяет, является ли пользователь администратором.
+     *
+     * @return bool
+     */
+    public function isAdministrator(): bool
+    {
+        return $this->role === 'admin';
     }
 }

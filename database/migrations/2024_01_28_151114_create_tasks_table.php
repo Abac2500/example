@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -8,28 +9,23 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
-     *
-     * @return void
      */
-    public function up()
+    public function up(): void
     {
         Schema::create('tasks', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained((new \App\Models\User())->getTable())->onDelete('cascade');
+            $table->foreignId('user_id')->constrained((new User())->getTable())->onDelete('cascade');
             $table->string('name')->nullable();
             $table->text('text')->nullable();
-            $table->integer('count')->nullable();
-            $table->timestamp('last')->nullable();
+            $table->timestamp('expiration_at')->nullable();
             $table->timestamps();
         });
     }
 
     /**
      * Reverse the migrations.
-     *
-     * @return void
      */
-    public function down()
+    public function down(): void
     {
         Schema::dropIfExists('tasks');
     }
